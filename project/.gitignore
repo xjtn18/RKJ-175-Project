@@ -1,3 +1,6 @@
 data/
+venv/
+test_array.pkl
+train_array.pkl
 .ipynb_checkpoints/
 __pycache__
