@@ -4,8 +4,12 @@ import numpy as np
 from sklearn.utils import shuffle
 import cv2
 import glob
+import torch
+from torch.autograd import Variable
+
 
 print_every = 25
+RS = 22 # random seed
 
 def get_cv2_image(path, img_w, img_h, color_type=3):
 	# Loading as Grayscale image
@@ -46,34 +50,37 @@ def reset(m):
 		m.reset_parameters()
 
 
-def train(model, loss_fn, optimizer, num_epochs = 1):
+def train(model, Xtrain, Ytrain, loss_fn, optimizer, num_epochs, dtype):
+	batch_size = 50
+	loss_history = []
 	for epoch in range(num_epochs):
 		print('Starting epoch %d / %d' % (epoch + 1, num_epochs))
 		model.train()
 		
-		batch_size = 50
 		batch_amount = int(np.floor(Xtrain.shape[0]/batch_size))
 		
 		for t in range(batch_amount):
 			x = Xtrain[t*batch_size:(t+1)*batch_size]
 			y = Ytrain[t*batch_size:(t+1)*batch_size]
 			
-			x_var = Variable(x.type(DTYPE))
-			y_var = Variable(y.type(DTYPE).long())
+			x_var = Variable(x.type(dtype))
+			y_var = Variable(y.type(dtype).long())
 
 			scores = model(x_var)
 			loss = loss_fn(scores, y_var)
-			
+
 			if (t + 1) % print_every == 0:
 				print('t = %d, loss = %.4f' % (t + 1, loss.item()))
+				loss_history.append(loss.item())
 
 			optimizer.zero_grad()
 			loss.backward()
 			optimizer.step()
+
 	return loss_history
 
 			
-def evaluate(model, Xdata, Ydata, length):  
+def evaluate(model, Xdata, Ydata, length, dtype):  
 	num_correct = 0
 	num_samples = 0
 	model.eval() # Put the model in test mode (the opposite of model.train(), essentially)
@@ -86,7 +93,7 @@ def evaluate(model, Xdata, Ydata, length):
 		y = Ydata[t*batch_size:(t+1)*batch_size]
 		
 		with torch.no_grad():
-			x_var = Variable(x.type(DTYPE))
+			x_var = Variable(x.type(dtype))
 
 		scores = model(x_var)
 		_, preds = scores.data.cpu().max(1)
@@ -96,5 +103,3 @@ def evaluate(model, Xdata, Ydata, length):
 	acc = float(num_correct) / num_samples
 	print(f'Got %d / %d correct (%.2f)' % (num_correct, num_samples, 100 * acc))
 	return 100 * acc
-
-
