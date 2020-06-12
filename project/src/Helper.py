@@ -3,9 +3,12 @@
 import numpy as np
 from sklearn.utils import shuffle
 import cv2
-import glob
+from glob import glob
 import torch
+import pandas as pd
 from torch.autograd import Variable
+import os
+import datetime
 
 
 print_every = 25
@@ -36,13 +39,16 @@ def load_train(img_w, img_h):
 
 
 def load_test(img_w, img_h):
-	Xtest = []
+	Xtest, test_ids = [], []
 	# Loop over the training folder 
 	files = glob(os.path.join('data', 'imgs', 'test', '*.jpg'))
 	for file in files:
 		img = get_cv2_image(file, img_w, img_h)
 		Xtest.append(img)
-	return shuffle(np.asarray(Xtest), random_state = RS)
+		base_file = os.path.basename(file)
+		test_ids.append(base_file)
+
+	return shuffle(np.asarray(Xtest), random_state = RS), test_ids
 
 
 def reset(m):
@@ -83,7 +89,7 @@ def train(model, Xtrain, Ytrain, loss_fn, optimizer, num_epochs, dtype):
 def evaluate(model, Xdata, Ydata, length, dtype):  
 	num_correct = 0
 	num_samples = 0
-	model.eval() # Put the model in test mode (the opposite of model.train(), essentially)
+	model.eval()
 	
 	batch_size = 50
 	batch_amount = int(np.floor(length/batch_size))
@@ -103,3 +109,47 @@ def evaluate(model, Xdata, Ydata, length, dtype):
 	acc = float(num_correct) / num_samples
 	print(f'Got %d / %d correct (%.2f)' % (num_correct, num_samples, 100 * acc))
 	return 100 * acc
+
+
+def get_predictions(model, Xdata, length, dtype):
+	batch_size = 50
+	batch_amount = int(np.ceil(length/batch_size))
+	all_preds = []
+	model.eval() # put model into test mode
+	for t in range(batch_amount): # load in batches to prevent CUDA memory error
+		x = Xdata[t*batch_size:(t+1)*batch_size]
+		with torch.no_grad():
+			x_var = Variable(x.type(dtype))
+
+		scores = model(x_var)
+		_, preds = scores.data.cpu().max(1)
+		all_preds.extend(np.asarray(preds))
+
+	return all_preds
+
+
+def create_submission(predictions, test_id):
+	# creates a submission for testing accuracy on kaggle
+	result = pd.DataFrame(predictions, columns=['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9'])
+	result.loc[:, 'img'] = pd.Series(test_id, index=result.index)
+
+	now = datetime.datetime.now()
+
+	if not os.path.isdir('kaggle_submissions'):
+		os.mkdir('kaggle_submissions')
+
+	suffix = "{}".format(str(now.strftime("%Y-%m-%d-%H-%M")))
+	sub_file = os.path.join('kaggle_submissions', 'submission_' + suffix + '.csv')
+
+	result.to_csv(sub_file, index=False)
+
+	return sub_file
+
+
+def to_prediction_list(p):
+	num_classes = len(np.unique(p))
+	pred_matrix = np.zeros((len(p),num_classes))
+	pred_matrix[np.arange(len(p)),p] = 1 # set classification index on every row to the predicted value
+	return pred_matrix
+
+
