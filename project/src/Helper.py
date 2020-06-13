@@ -116,7 +116,6 @@ def evaluate(model, Xdata, Ydata, length, dtype):
 def multiclass_log_loss(model, Xdata, Ydata, length, dtype):  
 	M = 10 # number of classifications (c0, c1, c2...)
 	
-
 	model.eval()
 	
 	batch_size = 50
@@ -145,6 +144,28 @@ def multiclass_log_loss(model, Xdata, Ydata, length, dtype):
 	
 	return logloss
 	
+
+def confusion_matrix(model, Xdata, Ydata, length, dtype):
+	matrix = [[0 for i in range(10)] for j in range(10)]
+
+	model.eval()
+
+	batch_size = 50
+	batch_amount = int(np.floor(length/batch_size))
+
+	for t in range(batch_amount):
+		x = Xdata[t*batch_size:(t+1)*batch_size]
+		y = Ydata[t*batch_size:(t+1)*batch_size]
+
+		with torch.no_grad():
+			x_var = Variable(x.type(dtype))
+		
+		scores = model(x_var)
+		_, preds = scores.data.cpu().max(1)
+
+		for i in range(batch_size):
+			matrix[preds[i]][y[i]] += 1
+	return matrix
 	
 def get_predictions(model, Xdata, length, dtype):
 	batch_size = 50
