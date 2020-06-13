@@ -1,5 +1,7 @@
 #torch model helpers
 
+
+import torch.nn as nn
 import numpy as np
 from sklearn.utils import shuffle
 import cv2
