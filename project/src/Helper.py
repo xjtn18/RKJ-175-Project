@@ -110,7 +110,40 @@ def evaluate(model, Xdata, Ydata, length, dtype):
 	print(f'Got %d / %d correct (%.2f)' % (num_correct, num_samples, 100 * acc))
 	return 100 * acc
 
+	
+def multiclass_log_loss(model, Xdata, Ydata, length, dtype):  
+	M = 10 # number of classifications (c0, c1, c2...)
+	
 
+	model.eval()
+	
+	batch_size = 50
+	batch_amount = int(np.floor(length/batch_size))
+	
+	logloss = 0
+	
+	for t in range(batch_amount):
+		x = Xdata[t*batch_size:(t+1)*batch_size]
+		y = Ydata[t*batch_size:(t+1)*batch_size]
+		
+		with torch.no_grad():
+			x_var = Variable(x.type(dtype))
+	   
+		p = nn.Softmax(dim=1)(model(x_var).data.cpu())
+				
+		for i in range(batch_size):
+			for j in range(M):
+				y_ij = 1 if y[i] == j else 0
+				logloss +=  y_ij * torch.log(p[i][j])
+
+		
+	logloss *= -1/length	
+	
+	print(logloss)
+	
+	return logloss
+	
+	
 def get_predictions(model, Xdata, length, dtype):
 	batch_size = 50
 	batch_amount = int(np.ceil(length/batch_size))
